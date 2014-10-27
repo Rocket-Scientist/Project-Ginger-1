@@ -8,10 +8,10 @@ Project-Ginger-1
 
 
 const int pressure_at_sea_level = 101325;
-int gravitational_constant = 1000;/*calc_grav_const;*/
+const float gravitational_constant = 6.67384E-11;
 const int radius_of_earth = 6378100;
-const int mass_of_earth = 1000;/*5.9726 * pow(10, 24);*/
-const int boltzman_constant = 0.00001;    /*1.3806488 * pow(10, -23);*/
+const float mass_of_earth = 5.9726E24;
+const float gas_constant = 8.31;
 const double PI = 3.141592654;
 float time;
 float density;
@@ -33,15 +33,16 @@ typedef struct	RSIMStructure {     /* Defining the data structure that is used t
 
 
 int Menu();
-int ValidateData(), DrawText(int x, int y, char * graphtitle, int xAlign, int yAlign), ChangeParameters(int payload, int number_of_boosters, int inert_mass, int centaur_engine_type, int i);
+int ValidateData(), DrawText(int x, int y, char * graphtitle, int xAlign, int yAlign), ChangeParameters(int payload, int number_of_boosters, int centaur_engine_type, int i);
 
-RSIMType ClearDataTable(RSIMType datatable), AddData(RSIMType datatable);
+RSIMType ClearDataTable(RSIMType datatable), AddData(RSIMType datatable, int number_of_boosters);
 
 void DisplayDataTable(RSIMType datatable, int fromrow, int torow), Graph_plotter();  
    
 char * displaytitle = "Atlas V 400 Rocket Simulation Data", * graph1ylabel = "Acceleration (m/s^2)", * graph1xlabel = "Time (s)", * graph2ylabel = "Altitude (m)", * graph2xlabel = "Fuel Usage (kg)";
 
 float timer(float dt);
+float calc_thrust(float thrust, int number_of_boosters);
 float calc_density(float air_temp, float molar_mass);
 float calc_drag(float drag_coefficient, float area_which_experiences_drag);
 float calc_acceleration(float thrust);
@@ -60,20 +61,19 @@ float calc_mass(float fuel_rate, float dt);
 int main() {                                                            /* Main function.*/
     RSIMType datatable;
     int choice;
-    int payload;
-    int number_of_boosters; 
-    int inert_mass;   
+    int payload;  
     int centaur_engine_type;
-    int i;                                                 /* Variables declared, and current row in the data table set to 0.*/
+    int i;           
+    int number_of_boosters = 3;                                      /* Variables declared, and current row in the data table set to 0.*/
     datatable.currentrow = 0;
     choice = 99;                                                        /* Enters the while loop.*/
     while(choice != 0) {
         choice = Menu();                                                /* Case statements corresponding to the users choice.*/
         switch(choice) {                                                /* Each one calls a function to perform a certain task.*/
-                case 1:  datatable = AddData(datatable);break;          /* If the input is incorrect, an error message will be displayed.*/
+                case 1:  datatable = AddData(datatable, number_of_boosters);break;          /* If the input is incorrect, an error message will be displayed.*/
                 case 2:  DisplayDataTable(datatable, 0, MAXROW); break;                                               /* When a function like this is called - the data structure is*/
                 case 3:  datatable = ClearDataTable(datatable); break;
-                case 4:  ChangeParameters(payload, number_of_boosters, inert_mass, centaur_engine_type, i); break;                             /* The break stops the while loop from running through each option*/                                                             
+                case 4:  ChangeParameters(payload, number_of_boosters, centaur_engine_type, i); break;                             /* The break stops the while loop from running through each option*/                                                             
                 case 5:  Graph_plotter(); break;
                 case 6:  choice = 0; break;                               /* once a case has been selected.*/   
                 default: printf("\nInvalid entry, please try again\n"); } 
@@ -232,22 +232,19 @@ int DrawText2(int x, int y, char * message, int xAlign, int yAlign) {           
 
 
 
-RSIMType AddData(RSIMType datatable) {
+RSIMType AddData(RSIMType datatable, int number_of_boosters) {
+     float thrust; 
      float total_time = 250;     /*changeable?*/     
      float drag_coefficient = 0.42;
      float area_which_experiences_drag = (PI / 4) * pow(5.4, 2);
-     /*float density;
-     float drag; 
-     float acceleration;*/
-     float molar_mass = 28.97;
+     float molar_mass = 0.02897;
      float fuel_rate = 450; /*need to look this up*/
-     float thrust = 8991400; /*made up*/
      float air_temp = 280; /*made up*/
      float dt = 1; /*let them choose this in proper one*/
      velocity = 0;
      altitude = 10;  
      mass = 500000; /*this is madeup*/
-     gravity = 9.81;
+     gravity = 9.7984;
      time = 0;
      
            /* Function takes data input and stores it in the data structure, row by row.*/
@@ -258,7 +255,8 @@ RSIMType AddData(RSIMType datatable) {
      else {
            while (time < total_time) { 
                     datatable.table[datatable.currentrow][COLt] = timer(dt);  
-	                datatable.table[datatable.currentrow][COLRo] = calc_density(air_temp, molar_mass);  
+	                thrust = calc_thrust(thrust, number_of_boosters);
+                    datatable.table[datatable.currentrow][COLRo] = calc_density(air_temp, molar_mass);  
 	                datatable.table[datatable.currentrow][COLdrag] = calc_drag(drag_coefficient,area_which_experiences_drag);
 	                datatable.table[datatable.currentrow][COLa] = calc_acceleration(thrust);
 	                datatable.table[datatable.currentrow][COLv] = calc_velocity(dt);
@@ -277,9 +275,17 @@ float timer(float dt){
       return time;
       }   
            
-           
+float calc_thrust(float thrust, int number_of_boosters) {
+      if (time <= 115) {
+           thrust = number_of_boosters * 1688400 + 3827000;}
+      else {
+           thrust = 3827000;}
+      return thrust;
+           }
+
 float calc_density(float air_temp, float molar_mass) {
-      density = (pressure_at_sea_level * pow(exp(1),(-1 * molar_mass * gravity * altitude) / (boltzman_constant * air_temp))) / (gravity * altitude); /*latest version on github*/
+      float pressure = pressure_at_sea_level * pow(exp(1),(-1 * molar_mass * gravity * altitude) / (gas_constant * air_temp));
+      density = (pressure * molar_mass)/(gas_constant * air_temp);
       return density;
       }
 
@@ -316,54 +322,48 @@ float calc_mass(float fuel_rate, float dt) {
 
 
 
-int ChangeParameters(int payload, int number_of_boosters, int inert_mass, int centaur_engine_type, int i){
+int ChangeParameters(int payload, int number_of_boosters, int centaur_engine_type, int i){
     int  inputfinished;
     char userinput;
     inputfinished = 0;
 	while (inputfinished == 0) {
-          printf("\nP=Mass of Payload  B=Number of Boosters  I=Inert Mass   C=Centaur Engine Type   T= Temperature   X=Return to Menu\n");
+          printf("\nP=Mass of Payload   B=Number of Boosters   C=Centaur Engine Type   T=Temperature   X=Return to Menu\n");
 		  scanf(" %c", &userinput);
 
           switch(toupper(userinput)) {                              /* 'toupper' converts all inputs to uppercase - lowercase can then be used too - user's choice.*/
                  case 'P': MassOfPayload(payload, i); break;           /* Case statement with the different options to the user.*/
                  case 'B': NumberOfBoosters(number_of_boosters); break;                                                       
-                 case 'I': InertMass(inert_mass); break;
                  case 'C': CentaurEngineType(centaur_engine_type, i); break;           
                  case 'T': printf("temp function"); break;
                  case 'X': inputfinished = 1; break;
                  default: printf("\nInvalid option, try again\n"); }     
     } 
-    return payload, number_of_boosters, inert_mass, centaur_engine_type; 
+    return payload, number_of_boosters, centaur_engine_type; 
 }      
     
 
 int MassOfPayload(int payload, int i) {
       printf ("Would you like to have:\n1. Short pay load\n2. Medium pay load\n3. Long pay load\n");
       i = ValidateData();
-      if (i = 1){ 
+      if (i == 1){ 
             payload = 3524;}
-      else if (i = 2){
+      else if (i == 2){
             payload = 4003;} 
-      else if (i = 3){ 
+      else if (i == 3){ 
             payload = 4379;}
       else { printf("\nInvalid entry, please try again\n"); }  
       return payload;
       }
 
 int NumberOfBoosters(int number_of_boosters) {
+      printf("%d", number_of_boosters);
       printf ("How many boosters would you like? (You can have 0-5): ");
       number_of_boosters = ValidateData();
+      printf("%d", number_of_boosters);
       return number_of_boosters;            /*how to prevent incorrect answers?*/
       }
 
-int InertMass(int inert_mass, int i) {
-      printf ("What type of JOECOLEBROOK would you like to use?:\n1. 5x1\n2. 5x2\n");
-      i = ValidateData();
-      if (i = 1) { inert_mass = 4459; } /*common centaur + interstage adapter*/
-      else if (i = 2) { inert_mass = 4689; }/*common centaur + interstage adapter*/
-      else { printf("\nInvalid entry, please try again\n"); }
-      return inert_mass;
-      }
+
 
 /*float calc_mass(int mass, int payload, int number_of_boosters, int inert_mass); {
       mass = payload + number_of_boosters * 46697 + inert_mass + 275 + 20830 + 285 + 284089 + 21351; /*payload, boosters, inert mass, common centaur(CFLR, Propellant), Atls booster cylindrical interstage adapter, atlas booster(propellant, inert mass*/
@@ -377,21 +377,6 @@ int CentaurEngineType(int centaur_engine_type, int i) {
       else if (i = 2) {centaur_engine_type = 198400; }
       else { printf("\nInvalid entry, please try again\n"); }
       return centaur_engine_type;
-      }
-
-/*float thrust_calc(int thrust, int centaur_engine_type, int i) {
-      thrust = centaur_engine_type + (number_of_boosters * 1688400) + 3827000;
-      return thrust;
-      }*/
-
-/*for temperature, i have googled rocket launches from the uk. on of the sites i a place called south uist. I have found the average temperature there to be about 7 degrees C so we could use this as our default case and then on the start menu when it says what the programme is we could just say "this programme is designed to simulate an Atlas V launching from Soutch Uist" or something like that*/
-
-
-
-
-
-/*int calc_grav_const() { 
-        gravitational_constant = 6.67384 * pow(10, -11); 
-        return gravitational_constant;
-        }*/
+      } 
+    
     
